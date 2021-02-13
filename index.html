@@ -1,0 +1,882 @@
+<html>
+	<head>
+		<title>RoflFlight</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width,minimum-scale=1.0,maximum-scale=1.0,initial-scale=1.0,user-scalable=no">
+		<style>@font-face{font-family:'Consolas';src:url(Consolas.ttf);}</style>
+	</head>
+	<body>
+		<script>
+			var RoflFlight={
+				canvas:false,
+				context:false,
+				canvasSetup:function(){if(RoflFlight.canvas==false||RoflFlight.context==false){return false;}else{return true;}},
+				atlas:false,
+				atlasLoaded:function(){if(RoflFlight.atlas==false){return false;}else{return true;}},
+				paused:true,
+				playing:false,
+				isPaused:function(){if(RoflFlight.paused==true||RoflFlight.playing==false){return true;}else{return false;}},
+				shouldAnimRun:function(thisEntity){
+					thisEntity=RoflFlight.formatEntity(thisEntity);
+					var returnsettings={'move':false,'animate':false,'process':false};
+					if(thisEntity['moveWhilePaused']==false&&RoflFlight.paused==true){returnsettings['move']=false;}
+					else if(thisEntity['moveWhilePaused']==true&&RoflFlight.paused==true){returnsettings['move']=true;}
+					else if(thisEntity['moveWhilePaused']==false&&RoflFlight.paused==false){returnsettings['move']=true;}
+					else if(thisEntity['moveWhilePaused']==true&&RoflFlight.paused==false){returnsettings['move']=true;}
+					if(thisEntity['animateWhilePaused']==false&&RoflFlight.paused==true){returnsettings['animate']=false;}
+					else if(thisEntity['animateWhilePaused']==true&&RoflFlight.paused==true){returnsettings['animate']=true;}
+					else if(thisEntity['animateWhilePaused']==false&&RoflFlight.paused==false){returnsettings['animate']=true;}
+					else if(thisEntity['animateWhilePaused']==true&&RoflFlight.paused==false){returnsettings['animate']=true;}
+					if(thisEntity['processWhilePaused']==false&&RoflFlight.paused==true){returnsettings['process']=false;}
+					else if(thisEntity['processWhilePaused']==true&&RoflFlight.paused==true){returnsettings['process']=true;}
+					else if(thisEntity['processWhilePaused']==false&&RoflFlight.paused==false){returnsettings['process']=true;}
+					else if(thisEntity['processWhilePaused']==true&&RoflFlight.paused==false){returnsettings['process']=true;}
+					return returnsettings;
+				},
+				metrics:{w:0,h:0},
+				getWidth:function(){return RoflFlight.metrics.w;},
+				getHeight:function(){return RoflFlight.metrics.h;},
+				setMinMax:function(ele,metric,num){
+					if(typeof ele!=='object'&&typeof ele!=='string'){return false;}
+					if(typeof ele=='string'){ele=document.getElementById(ele);}
+					metric=String(metric),num=parseFloat(num);
+					if(metric=='w'||metric=='width'){ele.width=num,ele.style.width=num,ele.style.minWidth=num,ele.style.maxWidth=num;}
+					if(metric=='h'||metric=='height'){ele.height=num,ele.style.height=num,ele.style.minHeight=num,ele.style.maxHeight=num;}
+					return true;
+				},
+				isDay:true,
+				checkIfDay:function(){(new Date).getHours()>=18||(new Date).getHours()<6?RoflFlight.isDay=false:RoflFlight.isDay=true;},
+				score:0,
+				lives:3,
+				speed:2,
+				mobile:false,
+				entities:new Array(),
+				clearAllEntities:function(){RoflFlight.entities=new Array();},
+				formatEntity:function(JSON){
+					typeof JSON!=='object'?JSON=new Object():null;
+					JSON.hasOwnProperty('name')?null:JSON['name']=String();
+					JSON.hasOwnProperty('class')?null:JSON['class']=String();
+					JSON.hasOwnProperty('zindex')?null:JSON['zindex']=0;
+					JSON.hasOwnProperty('animateDelayBetweenFrames')?null:JSON['animateDelayBetweenFrames']=0;
+					JSON.hasOwnProperty('animateCount')?null:JSON['animateCount']=0;
+					JSON.hasOwnProperty('animateCountUpBy')?null:JSON['animateCountUpBy']=0;
+					JSON.hasOwnProperty('createdAt')?null:JSON['createdAt']=(new Date).getTime();
+					JSON.hasOwnProperty('frames')?null:JSON['frames']=new Array();
+					JSON.hasOwnProperty('currentFrame')?null:JSON['currentFrame']=0;
+					JSON.hasOwnProperty('moveWhilePaused')?null:JSON['moveWhilePaused']=false;
+					JSON.hasOwnProperty('animateWhilePaused')?null:JSON['animateWhilePaused']=false;
+					JSON.hasOwnProperty('processWhilePaused')?null:JSON['processWhilePaused']=false;
+					JSON.hasOwnProperty('rotate')?null:JSON['rotate']=0;
+					JSON.hasOwnProperty('border')?null:JSON['border']=false;
+					JSON.hasOwnProperty('click')?null:JSON['click']=false;
+					JSON.hasOwnProperty('die')?null:JSON['die']=false;
+					JSON.hasOwnProperty('display')?null:JSON['display']=true;
+					JSON.hasOwnProperty('velocityX')?null:JSON['velocityX']=false;
+					JSON.hasOwnProperty('velocityY')?null:JSON['velocityY']=false;
+					JSON.hasOwnProperty('x')?null:JSON['x']=0;
+					JSON.hasOwnProperty('y')?null:JSON['y']=0;
+					JSON.hasOwnProperty('w')?null:JSON['w']=10;
+					JSON.hasOwnProperty('h')?null:JSON['h']=10;
+					JSON.hasOwnProperty('remove')?null:JSON['remove']=false;
+					return JSON;
+				},
+				entityPos:function(name){
+					if(RoflFlight.entities.length<=0){return false;}
+					name=String(name);
+					if(name==''){return false;}
+					var arrayPos=-1;
+					for(var ep=0;ep<RoflFlight.entities.length;ep++){
+						var thisEntity=RoflFlight.formatEntity(RoflFlight.entities[ep]);
+						if(thisEntity['name']==name){
+							arrayPos=ep;
+						}
+					}
+					if(arrayPos==-1){return false}
+					else{return arrayPos;}
+				},
+				entity:function(name){
+					var arrayPos=RoflFlight.entityPos(name);
+					if(arrayPos!==false){return RoflFlight.entities[arrayPos];}
+					else{return false;}
+				},
+				entityClass:function(name){
+					var thisClass=new Array();
+					if(RoflFlight.entities.length<=0){return thisClass;}
+					name=String(name);
+					if(name==''){return thisClass;}
+					for(var ep=0;ep<RoflFlight.entities.length;ep++){
+						var thisEntity=RoflFlight.formatEntity(RoflFlight.entities[ep]);
+						if(thisEntity['class']==name){thisClass.push(thisEntity['name'])}
+					}
+					thisClass.sort(function(a,b){return parseFloat(a['createdAt'])-parseFloat(b['createdAt'])});
+					return thisClass;
+				},
+				zIndex:function(){
+					var zIndex=new Array();
+					if(RoflFlight.entities.length<=0){return zIndex;}
+					for(var zc=0;zc<RoflFlight.entities.length;zc++){
+						var thisEntity=RoflFlight.formatEntity(RoflFlight.entities[zc]);
+						var thisZIndez=thisEntity['zindex'];
+						zIndex.hasOwnProperty(thisZIndez)?null:zIndex[thisZIndez]=new Array();
+						zIndex[thisZIndez].push(String(thisEntity['name']));
+					}
+					return zIndex;
+				},
+				atlasLocations:{
+					'player_roflcopter_1':{'x':626,'y':525,'w':232,'h':100},
+					'player_roflcopter_2':{'x':626,'y':670,'w':232,'h':100},
+					'player_roflcar_1':{'x':575,'y':792,'w':188,'h':100},
+					'player_roflcar_2':{'x':786,'y':792,'w':188,'h':100},
+					'player_roflcar_3':{'x':575,'y':903,'w':188,'h':100},
+					'player_roflcar_4':{'x':786,'y':903,'w':188,'h':100},
+					'background_light':{'x':0,'y':0,'w':280,'h':480},
+					'background_dark':{'x':295,'y':0,'w':280,'h':480},
+					'ground':{'x':590,'y':0,'w':264,'h':80},
+					'0_big':{'x':993,'y':115,'w':23,'h':45},
+					'1_big':{'x':269,'y':905,'w':22,'h':45},
+					'2_big':{'x':584,'y':315,'w':25,'h':45},
+					'3_big':{'x':612,'y':315,'w':25,'h':45},
+					'4_big':{'x':640,'y':315,'w':25,'h':45},
+					'5_big':{'x':668,'y':315,'w':25,'h':45},
+					'6_big':{'x':584,'y':363,'w':25,'h':45},
+					'7_big':{'x':612,'y':363,'w':25,'h':45},
+					'8_big':{'x':640,'y':363,'w':25,'h':45},
+					'9_big':{'x':668,'y':363,'w':25,'h':45},
+					'pipe_up_red':{'x':0,'y':645,'w':53,'h':250},
+					'pipe_up_green':{'x':168,'y':645,'w':53,'h':250},
+					'pipe_up_grey':{'x':947,'y':215,'w':53,'h':250},
+					'heart':{'x':318,'y':898,'w':85,'h':84},
+					'play':{'x':708,'y':235,'w':105,'h':60},
+				},
+				getAtlasLoc:function(name){
+					name=String(name);
+					if(name==''){return false;}
+					if(RoflFlight.atlasLocations.hasOwnProperty(name)==false){return false;}
+					else{
+						if(typeof RoflFlight.atlasLocations[name]!=='object'){return false;}
+						else{
+							if(
+								RoflFlight.atlasLocations[name].hasOwnProperty('x')&&
+								RoflFlight.atlasLocations[name].hasOwnProperty('y')&&
+								RoflFlight.atlasLocations[name].hasOwnProperty('w')&&
+								RoflFlight.atlasLocations[name].hasOwnProperty('h')
+							){return RoflFlight.atlasLocations[name];}
+							else{return false;}
+						}
+					}
+				},
+				questions:{
+					canAdd:true,
+					level:1,
+					addDelayMS:700,
+					currentDelayMS:0,
+					questions:[
+						// Level 1
+						{'l':'1','q':'1','a':'1'},
+						{'l':'1','q':'2','a':'2'},
+						{'l':'1','q':'3','a':'3'},
+						{'l':'1','q':'4','a':'4'},
+						{'l':'1','q':'5','a':'5'},
+						{'l':'1','q':'6','a':'6'},
+						{'l':'1','q':'7','a':'7'},
+						{'l':'1','q':'8','a':'8'},
+						{'l':'1','q':'9','a':'9'},
+						// Level 2
+						{'l':'2','q':'1+1','a':'2'},
+						{'l':'2','q':'1+2','a':'3'},
+						{'l':'2','q':'1+3','a':'4'},
+						{'l':'2','q':'1+4','a':'5'},
+						{'l':'2','q':'2+1','a':'3'},
+						{'l':'2','q':'2+2','a':'4'},
+						{'l':'2','q':'2+3','a':'5'},
+						{'l':'2','q':'3+1','a':'4'},
+						{'l':'2','q':'3+2','a':'5'},
+						{'l':'2','q':'4+1','a':'5'},
+						{'l':'2','q':'5-1','a':'4'},
+						{'l':'2','q':'5-2','a':'3'},
+						{'l':'2','q':'5-3','a':'2'},
+						{'l':'2','q':'5-4','a':'1'},
+						{'l':'2','q':'4-1','a':'3'},
+						{'l':'2','q':'4-2','a':'2'},
+						{'l':'2','q':'4-3','a':'1'},
+						{'l':'2','q':'3-1','a':'2'},
+						{'l':'2','q':'3-2','a':'1'},
+						{'l':'2','q':'2-1','a':'1'},
+						// Level 3
+						{'l':'3','q':'0+1','a':'1'},
+						{'l':'3','q':'0+2','a':'2'},
+						{'l':'3','q':'0+3','a':'3'},
+						{'l':'3','q':'0+4','a':'4'},
+						{'l':'3','q':'0+5','a':'5'},
+						{'l':'3','q':'0+6','a':'6'},
+						{'l':'3','q':'0+7','a':'7'},
+						{'l':'3','q':'0+8','a':'8'},
+						{'l':'3','q':'0+9','a':'9'},
+						{'l':'3','q':'5+0','a':'5'},
+						{'l':'3','q':'5+1','a':'6'},
+						{'l':'3','q':'5+2','a':'7'},
+						{'l':'3','q':'5+3','a':'8'},
+						{'l':'3','q':'5+4','a':'9'},
+						{'l':'3','q':'6+0','a':'6'},
+						{'l':'3','q':'6+1','a':'7'},
+						{'l':'3','q':'6+2','a':'8'},
+						{'l':'3','q':'6+3','a':'9'},
+						{'l':'3','q':'7+0','a':'7'},
+						{'l':'3','q':'7+1','a':'8'},
+						{'l':'3','q':'7+2','a':'9'},
+						{'l':'3','q':'8+0','a':'8'},
+						{'l':'3','q':'8+1','a':'9'},
+						{'l':'3','q':'9+0','a':'9'},
+						{'l':'3','q':'9-0','a':'9'},
+						{'l':'3','q':'9-1','a':'8'},
+						{'l':'3','q':'9-2','a':'7'},
+						{'l':'3','q':'9-3','a':'6'},
+						{'l':'3','q':'9-4','a':'5'},
+						{'l':'3','q':'9-5','a':'4'},
+						{'l':'3','q':'9-6','a':'3'},
+						{'l':'3','q':'9-7','a':'2'},
+						{'l':'3','q':'9-8','a':'1'},
+						{'l':'3','q':'8-0','a':'8'},
+						{'l':'3','q':'8-1','a':'7'},
+						{'l':'3','q':'8-2','a':'6'},
+						{'l':'3','q':'8-3','a':'5'},
+						{'l':'3','q':'8-4','a':'4'},
+						{'l':'3','q':'8-5','a':'3'},
+						{'l':'3','q':'8-6','a':'2'},
+						{'l':'3','q':'8-7','a':'1'},
+						{'l':'3','q':'7-0','a':'7'},
+						{'l':'3','q':'7-1','a':'6'},
+						{'l':'3','q':'7-2','a':'5'},
+						{'l':'3','q':'7-3','a':'4'},
+						{'l':'3','q':'7-4','a':'3'},
+						{'l':'3','q':'7-5','a':'2'},
+						{'l':'3','q':'7-6','a':'1'},
+						{'l':'3','q':'6-0','a':'6'},
+						{'l':'3','q':'6-1','a':'5'},
+						{'l':'3','q':'6-2','a':'4'},
+						{'l':'3','q':'6-3','a':'3'},
+						{'l':'3','q':'6-4','a':'2'},
+						{'l':'3','q':'6-5','a':'1'},
+						{'l':'3','q':'5-0','a':'5'},
+						{'l':'3','q':'5-1','a':'4'},
+						{'l':'3','q':'5-2','a':'3'},
+						{'l':'3','q':'5-3','a':'2'},
+						{'l':'3','q':'5-4','a':'1'},
+						{'l':'3','q':'4-0','a':'4'},
+						{'l':'3','q':'4-1','a':'3'},
+						{'l':'3','q':'4-2','a':'2'},
+						{'l':'3','q':'4-3','a':'1'},
+						{'l':'3','q':'3-0','a':'3'},
+						{'l':'3','q':'3-1','a':'2'},
+						{'l':'3','q':'3-2','a':'1'},
+						{'l':'3','q':'2-0','a':'2'},
+						{'l':'3','q':'2-1','a':'1'},
+						{'l':'3','q':'1-0','a':'1'},
+						// Level 4
+						{'l':'4','q':'1x1','a':'1'},
+						{'l':'4','q':'1x2','a':'2'},
+						{'l':'4','q':'1x3','a':'3'},
+						{'l':'4','q':'1x4','a':'4'},
+						{'l':'4','q':'1x5','a':'5'},
+						{'l':'4','q':'1x6','a':'6'},
+						{'l':'4','q':'1x7','a':'7'},
+						{'l':'4','q':'1x8','a':'8'},
+						{'l':'4','q':'1x9','a':'9'},
+						{'l':'4','q':'2x1','a':'2'},
+						{'l':'4','q':'2x2','a':'4'},
+						{'l':'4','q':'2x3','a':'6'},
+						{'l':'4','q':'2x4','a':'8'},
+						{'l':'4','q':'3x1','a':'3'},
+						{'l':'4','q':'3x2','a':'6'},
+						{'l':'4','q':'3x3','a':'9'},
+						{'l':'4','q':'4x1','a':'4'},
+						{'l':'4','q':'4x2','a':'8'},
+						{'l':'4','q':'5x1','a':'5'},
+						{'l':'4','q':'6x1','a':'6'},
+						{'l':'4','q':'7x1','a':'7'},
+						{'l':'4','q':'8x1','a':'8'},
+						{'l':'4','q':'9x1','a':'9'},
+						// Level 5
+						{'l':'5','q':'1÷1','a':'1'},
+						{'l':'5','q':'2÷1','a':'2'},
+						{'l':'5','q':'3÷1','a':'3'},
+						{'l':'5','q':'4÷1','a':'4'},
+						{'l':'5','q':'5÷1','a':'5'},
+						{'l':'5','q':'6÷1','a':'6'},
+						{'l':'5','q':'7÷1','a':'7'},
+						{'l':'5','q':'8÷1','a':'8'},
+						{'l':'5','q':'9÷1','a':'9'},
+						{'l':'5','q':'2÷2','a':'1'},
+						{'l':'5','q':'3÷3','a':'1'},
+						{'l':'5','q':'4÷2','a':'2'},
+						{'l':'5','q':'5÷5','a':'1'},
+						{'l':'5','q':'6÷2','a':'3'},
+						{'l':'5','q':'6÷3','a':'2'},
+						{'l':'5','q':'6÷6','a':'1'},
+						{'l':'5','q':'7÷7','a':'1'},
+						{'l':'5','q':'8÷2','a':'4'},
+						{'l':'5','q':'8÷4','a':'2'},
+						{'l':'5','q':'8÷8','a':'1'},
+						{'l':'5','q':'9÷3','a':'3'},
+						{'l':'5','q':'9÷9','a':'1'},
+						// Level 6
+						{'l':'6','q':'10÷2','a':'5'},
+						{'l':'6','q':'10÷5','a':'2'},
+						{'l':'6','q':'12÷2','a':'6'},
+						{'l':'6','q':'12÷3','a':'4'},
+						{'l':'6','q':'12÷4','a':'3'},
+						{'l':'6','q':'12÷6','a':'2'},
+						{'l':'6','q':'14÷2','a':'7'},
+						{'l':'6','q':'14÷7','a':'2'},
+						{'l':'6','q':'15÷3','a':'5'},
+						{'l':'6','q':'15÷5','a':'3'},
+						{'l':'6','q':'16÷2','a':'8'},
+						{'l':'6','q':'16÷4','a':'4'},
+						{'l':'6','q':'16÷8','a':'2'},
+						{'l':'6','q':'18÷2','a':'9'},
+						{'l':'6','q':'18÷3','a':'6'},
+						{'l':'6','q':'18÷3','a':'6'},
+						{'l':'6','q':'18÷6','a':'3'},
+						{'l':'6','q':'18÷9','a':'2'},
+						{'l':'6','q':'20÷4','a':'5'},
+						{'l':'6','q':'20÷5','a':'4'},
+						// Level 7
+						{'l':'7','q':'(5x3)-6','a':'9'},
+						{'l':'7','q':'(2x5)-2','a':'8'},
+						{'l':'7','q':'(8+5)-6','a':'7'},
+						{'l':'7','q':'(2x2)+2','a':'6'},
+						{'l':'7','q':'(2x4)-3','a':'5'},
+						{'l':'7','q':'(2+2)+0','a':'4'},
+						{'l':'7','q':'(2x4)-5','a':'3'},
+						{'l':'7','q':'(1x1)+1','a':'2'},
+						{'l':'7','q':'(0+0)+1','a':'1'},
+						{'l':'7','q':'5+(2x2)','a':'9'},
+						{'l':'7','q':'2+(3x2)','a':'8'},
+						{'l':'7','q':'4+(1+2)','a':'7'},
+						{'l':'7','q':'4+(2x1)','a':'6'},
+						{'l':'7','q':'0+(5x1)','a':'5'},
+						{'l':'7','q':'8-(1x4)','a':'4'},
+						{'l':'7','q':'4-(0+1)','a':'3'},
+						{'l':'7','q':'8-(3x2)','a':'2'},
+						{'l':'7','q':'1+(0x1)','a':'1'},
+						// Level 8
+						{'l':'8','q':'15-(12÷2)','a':'9'},
+						{'l':'8','q':'16-(24÷3)','a':'8'},
+						{'l':'8','q':'17-(30÷3)','a':'7'},
+						{'l':'8','q':'18-(36÷3)','a':'6'},
+						{'l':'8','q':'19-(28÷2)','a':'5'},
+						{'l':'8','q':'14-(5x2)','a':'4'},
+						{'l':'8','q':'11-(16÷2)','a':'3'},
+						{'l':'8','q':'12-(8+2)','a':'2'},
+						{'l':'8','q':'13-(6x2)','a':'1'},
+						{'l':'8','q':'(15÷3)+4','a':'9'},
+						{'l':'8','q':'(12÷2)+2','a':'8'},
+						{'l':'8','q':'(18÷2)-2','a':'7'},
+						{'l':'8','q':'(14÷7)+4','a':'6'},
+						{'l':'8','q':'(15+2)-12','a':'5'},
+						{'l':'8','q':'(16÷2)-4','a':'4'},
+						{'l':'8','q':'(17+3)-17','a':'3'},
+						{'l':'8','q':'(18÷9)+0','a':'2'},
+						{'l':'8','q':'(19-9)-9','a':'1'},
+					]
+				},
+				questionTick:function(){
+					if(RoflFlight.questions.canAdd==false){
+						RoflFlight.questions.currentDelayMS+=1;
+						if(RoflFlight.questions.currentDelayMS>=RoflFlight.questions.addDelayMS){
+							RoflFlight.questions.canAdd=true;
+							RoflFlight.questions.currentDelayMS=0;
+						}
+					}
+				},
+				randomQuestion:function(){
+					console.log();
+					var level=parseInt(RoflFlight.questions.level);
+					var whatToDo=Math.floor(Math.random()*5)+1;
+					var returnQuestion=RoflFlight.questions.questions[0];
+					if(whatToDo==1){
+						//Random Question Of Pretedermined Array Of Levels
+						var randomLevels=new Array('1');
+						if(level>=2){randomLevels.push('2')}
+						if(level>=2){randomLevels.push('3')}
+						if(level>=3){randomLevels.push('3')}
+						if(level>=4){randomLevels.push('4')}
+						if(level>=5){randomLevels.push('5')}
+						if(level>=6){randomLevels.push('6')}
+						if(level>=7){randomLevels.push('7')}
+						if(level>=8){randomLevels.push('8')}
+						var randomNumber=Math.floor(Math.random()*(randomLevels.length-1));
+						var randomLevel=randomLevels[randomNumber];
+						returnQuestion=RoflFlight.questions.questions[randomLevel];
+					}
+					else if(whatToDo>1){
+						//Random Question Of A Particular Level
+						returnQuestion=RoflFlight.randomQuestionOfLevel(level)
+					}
+					console.log('Level:',level,'What To Do:',whatToDo,'Return Question',returnQuestion);
+					return returnQuestion;
+				},
+				randomQuestionOfLevel:function(level){
+					level=parseInt(level);
+					if(level==NaN||level<=0||level>8){return false;}
+					var questionsOfLevel=new Array();
+					if(RoflFlight.questions.questions.length<=0){return false;}
+					for(var qol=0;qol<RoflFlight.questions.questions.length;qol++){
+						var thisQuestion=RoflFlight.questions.questions[qol];
+						if(String(level)==thisQuestion['l']){
+							questionsOfLevel.push(thisQuestion)
+						}
+					}
+					if(questionsOfLevel.length<=0){return false;}
+					var randomNumber=Math.floor(Math.random()*(questionsOfLevel.length-1));
+					return questionsOfLevel[randomNumber];
+				},
+				answerQuestion:function(num){
+					if(RoflFlight.isPaused()==true){return false;}
+					num=parseInt(num);
+					if(num==NaN||num<1||num>9){return false;}
+					if(RoflFlight.lives<=0){return false;}
+					var currentBollards=RoflFlight.entityClass('bollard');
+					for(var cb=0;cb<currentBollards.length;cb++){
+						var thisBollard=RoflFlight.entity(currentBollards[cb]);
+						if(thisBollard['focus']==true&&thisBollard['answered']==false&&thisBollard['impact']==false){
+							if(String(num)==String(thisBollard['question']['a'])){
+								RoflFlight.score+=1;
+								if(RoflFlight.mobile==false){
+									RoflFlight.questions.addDelayMS>=200?RoflFlight.questions.addDelayMS-=50:null;
+									RoflFlight.questions.addDelayMS<200&&RoflFlight.questions.addDelayMS>90?RoflFlight.questions.addDelayMS-=10:null;
+									RoflFlight.questions.addDelayMS<90?RoflFlight.questions.addDelayMS=90:null;
+								}
+								else{
+									RoflFlight.questions.addDelayMS>=600?RoflFlight.questions.addDelayMS-=50:null;
+									RoflFlight.questions.addDelayMS<600&&RoflFlight.questions.addDelayMS>400?RoflFlight.questions.addDelayMS-=20:null;
+									RoflFlight.questions.addDelayMS<400?RoflFlight.questions.addDelayMS=400:null;
+								}
+								RoflFlight.entities[RoflFlight.entityPos(currentBollards[cb])]['answered']=true;
+								if(currentBollards.length==1){
+									var generateQuestion=RoflFlight.generateQuestion();
+									RoflFlight.addBollard(generateQuestion);
+									RoflFlight.questions.canAdd=false;
+									RoflFlight.questions.currentDelayMS=0;
+								}
+								return true;
+							}
+							else{
+								RoflFlight.lives-=1;
+								return false;
+							}
+						}
+					}
+				},
+				generateQuestion:function(){
+					if(RoflFlight.score<10){return RoflFlight.randomQuestionOfLevel(RoflFlight.questions.level);}
+					else{return RoflFlight.randomQuestion();}
+				},
+				addBollard:function(question){
+					if(typeof question!=='object'){return false;}
+					else{
+						if(question.hasOwnProperty('q')==false||question.hasOwnProperty('a')==false){return false;}
+						else{
+							RoflFlight.entities.push(RoflFlight.formatEntity({'name':'bollard'+(new Date).getTime(),'zindex':0,'class':'bollard','velocityX':-RoflFlight.speed,'velocityY':false,'x':RoflFlight.getWidth(),'y':0,'w':40,'h':170,'frames':[RoflFlight.getAtlasLoc('pipe_up_grey'),RoflFlight.getAtlasLoc('pipe_up_red'),RoflFlight.getAtlasLoc('pipe_up_green')],'question':question,'answered':false,'fallingX':0,'focus':false,'impact':false}));
+							return true;
+						}
+					}
+				},
+				draw:function(RoflFlight,thisEntity){
+					var drawEntity=new Object();
+					for(var de in thisEntity){drawEntity[de]=thisEntity[de];}
+					drawEntity=RoflFlight.formatEntity(drawEntity);
+					var thisFrame=drawEntity['currentFrame'];
+					var thisTemplate=drawEntity['frames'][thisFrame];
+					var thisMaskX=thisTemplate['x'];
+					var thisMaskY=thisTemplate['y'];
+					var thisMaskW=thisTemplate['w'];
+					var thisMaskH=thisTemplate['h'];
+					var thisPosX=drawEntity['x'];
+					var thisPosY=drawEntity['y'];
+					var thisMetricW=drawEntity['w'];
+					var thisMetricH=drawEntity['h'];
+					var thisRotation=drawEntity['rotate'];
+					var thisBorder=drawEntity['border'];
+					if(RoflFlight.atlasLoaded()==true){
+						if(thisRotation==0){
+							RoflFlight.context.drawImage(RoflFlight.atlas,thisMaskX,thisMaskY,thisMaskW,thisMaskH,thisPosX,thisPosY,thisMetricW,thisMetricH);
+							if(thisBorder==true){
+								RoflFlight.context.rect(thisPosX,thisPosY,thisMetricW,thisMetricH);
+								RoflFlight.context.stroke();	
+							}
+						}
+						else{
+							RoflFlight.context.save();
+							RoflFlight.context.translate(thisPosX+(thisMetricW/2),thisPosY+(thisMetricH/2));
+							RoflFlight.context.rotate(thisRotation);
+							RoflFlight.context.drawImage(RoflFlight.atlas,thisMaskX,thisMaskY,thisMaskW,thisMaskH,-(thisMetricW/2),-(thisMetricH/2),thisMetricW,thisMetricH);
+							if(thisBorder==true){
+								RoflFlight.context.rect(-(thisMetricW/2),-(thisMetricH/2),thisMetricW,thisMetricH);
+								RoflFlight.context.stroke();	
+							}
+							RoflFlight.context.restore();
+						}
+					}
+				},
+				loop:function(){
+					RoflFlight.metrics.w=parseFloat(window.innerWidth),RoflFlight.metrics.h=parseFloat(window.innerHeight);
+					RoflFlight.setMinMax(RoflFlight.canvas,'w',RoflFlight.getWidth()),RoflFlight.setMinMax(RoflFlight.canvas,'h',RoflFlight.getHeight());
+					RoflFlight.isDay==true?bg=RoflFlight.getAtlasLoc('background_light'):bg=RoflFlight.getAtlasLoc('background_dark');
+					RoflFlight.isDay==true?document.body.style.background='#46C0CB':document.body.style.background='#008793';
+					RoflFlight.context.clearRect(0,0,RoflFlight.getWidth(),RoflFlight.getHeight());
+					RoflFlight.score>1000?RoflFlight.score=1000:null;
+					RoflFlight.score<0?RoflFlight.score=0:null;
+					RoflFlight.lives>3?RoflFlight.score=3:null;
+					RoflFlight.lives<0?RoflFlight.lives=0:null;
+					if(RoflFlight.lives==0){
+						RoflFlight.paused=true;
+						RoflFlight.playing=false;
+					}
+					var bottom=RoflFlight.getHeight();
+					var floors=parseInt(RoflFlight.getWidth()/RoflFlight.atlasLocations['ground']['w'])+2;
+					RoflFlight.speed=parseFloat(String(RoflFlight.getWidth()/420).substring(0,3));
+					if(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)){RoflFlight.mobile=true;}
+					else{RoflFlight.mobile=false;}
+					if(RoflFlight.canvasSetup()==true&&RoflFlight.atlasLoaded()){
+						(function(){for(var te=0;te<RoflFlight.entities.length;te++){if(RoflFlight.formatEntity(RoflFlight.entities[te])['remove']==true){RoflFlight.entities.splice(te,1);}}})();
+						(function(){for(var bgi=0;bgi<(parseInt(RoflFlight.getWidth()/280)+1);bgi++){RoflFlight.context.drawImage(RoflFlight.atlas,bg['x'],bg['y'],bg['w'],bg['h'],(bgi*bg['w']),(bottom-bg['h']),bg['w'],500)}})();
+						(function(){
+							var floorBottom=bottom-RoflFlight.getAtlasLoc('ground')['h'];
+							var floorEntities=RoflFlight.entityClass('ground');
+							var floorEntitiesHowMany=floorEntities.length;
+							var floorEntitiesOutBy=floors-floorEntitiesHowMany;
+							if(floorEntitiesOutBy==0){return false;}
+							for(var feob=0;feob<floorEntitiesOutBy;feob++){
+								var thisNumber=feob+floorEntitiesHowMany;
+								RoflFlight.entities.push(RoflFlight.formatEntity({'name':'ground'+thisNumber,'zindex':1,'class':'ground','velocityX':-RoflFlight.speed,'velocityY':false,'x':0,'y':0,'w':RoflFlight.atlasLocations['ground']['w'],'h':parseInt(RoflFlight.atlasLocations['ground']['h']*0.8),'frames':[RoflFlight.getAtlasLoc('ground')] }));
+							}
+							floorEntities=RoflFlight.entityClass('ground');
+							floorEntitiesHowMany=floorEntities.length;
+							for(var fe=0;fe<floorEntitiesHowMany;fe++){
+								var thisEntityName=floorEntities[fe];
+								var thisEntity=RoflFlight.formatEntity(RoflFlight.entities[RoflFlight.entityPos(thisEntityName)]);
+								var thisNum=parseInt(thisEntity['name'].substring((thisEntity['name'].length-1),thisEntity['name'].length));
+								thisEntity['x']=(RoflFlight.getAtlasLoc('ground')['w']*thisNum);
+								RoflFlight.entities[RoflFlight.entityPos(thisEntityName)]=thisEntity;
+							}
+						})();
+						if(RoflFlight.questions.canAdd==true){
+							if(RoflFlight.isPaused()==false){
+								RoflFlight.questions.canAdd=false;
+								var generateQuestion=RoflFlight.generateQuestion();
+								RoflFlight.addBollard(generateQuestion);
+							}
+						}
+						if(RoflFlight.score<10){RoflFlight.questions.level=1;}
+						else if(RoflFlight.score>10&&RoflFlight.score<=20){RoflFlight.questions.level=2;}
+						else if(RoflFlight.score>20&&RoflFlight.score<=30){RoflFlight.questions.level=3;}
+						else if(RoflFlight.score>30&&RoflFlight.score<=45){RoflFlight.questions.level=4;}
+						else if(RoflFlight.score>45&&RoflFlight.score<=60){RoflFlight.questions.level=6;}
+						else if(RoflFlight.score>60&&RoflFlight.score<=75){RoflFlight.questions.level=7;}
+						else if(RoflFlight.score>75){RoflFlight.questions.level=8;}
+						(function(){
+							var bollard0=RoflFlight.entity(RoflFlight.entityClass('bollard')[0]);
+							if(bollard0['answered']==false&&bollard0['focus']==false){
+								bollard0['focus']=true;
+								RoflFlight.entities[RoflFlight.entityPos(RoflFlight.entityClass('bollard')[0])]['focus']=true;
+							}
+							if(bollard0['answered']==true&&bollard0['focus']==true){
+								bollard0['focus']=false;
+								RoflFlight.entities[RoflFlight.entityPos(RoflFlight.entityClass('bollard')[0])]['focus']=false;
+								if(RoflFlight.entityClass('bollard').length>1){
+									RoflFlight.entities[RoflFlight.entityPos(RoflFlight.entityClass('bollard')[1])]['focus']=true;
+								}
+							}
+						})();
+						var zIndex=RoflFlight.zIndex();
+						if(zIndex.length>0){
+							for(var zi=0;zi<zIndex.length;zi++){
+								var thisZIndex=zIndex[zi];
+								if(typeof thisZIndex!=='object'){continue;}
+								if(thisZIndex.length<=0){continue;}
+								for(var zc=0;zc<thisZIndex.length;zc++){
+									var thisZIndexChild=String(thisZIndex[zc]);
+									var thisEntity=RoflFlight.formatEntity(RoflFlight.entity(thisZIndexChild));
+									if(typeof thisEntity!=='object'){continue;}
+									var thisSettings=RoflFlight.shouldAnimRun(thisEntity);
+									var alreadyDrawn=false;
+									if(thisSettings['move']==true){
+										thisEntity['velocityX']==false?null:thisEntity['x']+=thisEntity['velocityX'];
+										thisEntity['velocityY']==false?null:thisEntity['y']+=thisEntity['velocityY'];
+									}
+									if(thisSettings['animate']==true){
+										if(thisEntity['frames'].length>1&&thisEntity['animateDelayBetweenFrames']!==0&&thisEntity['animateCountUpBy']!==0){
+											thisEntity['animateCount']+=thisEntity['animateCountUpBy'];
+											if(thisEntity['animateCount']>=thisEntity['animateDelayBetweenFrames']){
+												thisEntity['animateCount']=0;
+												thisEntity['currentFrame']+=1;
+												if(thisEntity['currentFrame']>=thisEntity['frames'].length){
+													thisEntity['currentFrame']=0;
+												}
+											}
+										}
+									}
+									if(thisEntity['class']=='ground'){
+										thisEntity['velocityX']=-RoflFlight.speed;
+										var groundWidth=RoflFlight.atlasLocations['ground']['w'];
+										thisEntity['x']<=-groundWidth?thisEntity['x']=(floors*groundWidth)-groundWidth:null;
+										thisEntity['y']=RoflFlight.getHeight()-parseFloat(thisEntity['h']);
+									}
+									else if(thisEntity['class']=='player'){
+										var fixedToBottom=bottom-120-parseFloat(thisEntity['h']);
+										if(thisEntity['show']=='copter'){
+											if(RoflFlight.mobile==false){
+												if(thisEntity['x']<=0){thisEntity['velocityX']=parseFloat('0.'+parseInt((Math.random()/2)*10));}
+												else if(thisEntity['x']>=60){thisEntity['velocityX']=-parseFloat('0.'+parseInt((Math.random()/2)*10));}
+											}
+											else{
+												thisEntity['velocityX']=false;
+												thisEntity['x']=0;
+											}
+										}
+										else if(thisEntity['show']=='car'){
+											thisEntity['x']=5;
+											thisEntity['y']=-20;
+										}
+										if(thisEntity['y']<=0){thisEntity['velocityY']=parseFloat('0.'+parseInt((Math.random()/2)*10));}
+										else if(thisEntity['y']>=50){thisEntity['velocityY']=-parseFloat('0.'+parseInt((Math.random()/2)*10));}
+										if(thisEntity['show']=='copter'){
+											if(thisEntity['currentFrame']>1){
+												thisEntity['currentFrame']=0;
+											}
+										}
+										else if(thisEntity['show']=='car'){
+											if(thisEntity['currentFrame']<2){
+												thisEntity['currentFrame']=2;
+											}
+										}
+										var defaultW=RoflFlight.getAtlasLoc('player_roflcopter_1')['w'];
+										thisEntity['show']=='car'?defaultW=RoflFlight.getAtlasLoc('player_roflcar_1')['w']:null;
+										var defaultH=RoflFlight.getAtlasLoc('player_roflcopter_1')['h'];
+										thisEntity['show']=='car'?defaultH=RoflFlight.getAtlasLoc('player_roflcar_1')['h']:null;
+										thisEntity['w']=defaultW*0.8;
+										thisEntity['h']=defaultH*0.8;
+										if(RoflFlight.getWidth()<500){
+											thisEntity['w']=defaultW*0.5;
+											thisEntity['h']=defaultH*0.5;
+										}
+										thisEntity['show']=='copter'?thisEntity['rotate']=(thisEntity['velocityX']*11)*(Math.PI/180):null;
+										thisEntity['show']=='car'?thisEntity['rotate']=0:null;
+										thisEntity['show']=='copter'?thisEntity['animateDelayBetweenFrames']=5:null;
+										thisEntity['show']=='car'?thisEntity['animateDelayBetweenFrames']=20:null;
+										RoflFlight.isPaused()==true&&thisEntity['show']=='car'?thisEntity['animateDelayBetweenFrames']=0:null;
+										var fakeData=new Object();
+										for(var ev in thisEntity){fakeData[ev]=thisEntity[ev];}
+										fakeData=RoflFlight.formatEntity(fakeData);
+										fakeData['x']=5+fakeData['x']-RoflFlight.canvas.offsetLeft;
+										fakeData['y']=fixedToBottom+40-fakeData['y'];
+										if(fakeData['display']==true){
+											(eval(RoflFlight.draw))(RoflFlight,fakeData)
+										}
+										alreadyDrawn=true;
+									}
+									else if(thisEntity['class']=='score'){
+										if(thisSettings['process']==true){
+											var theScore=String(RoflFlight.score).split('');
+											for(var si=0;si<theScore.length;si++){
+												var thisScoreDigit=String(theScore[si]);
+												var fakeData=new Object();
+												for(var ev in thisEntity){fakeData[ev]=thisEntity[ev];}
+												fakeData=RoflFlight.formatEntity(fakeData);
+												fakeData['x']=(20+(thisEntity['w']*si)+(3*si));
+												fakeData['frames']=[RoflFlight.getAtlasLoc(thisScoreDigit+'_big')];
+												if(fakeData['display']==true){
+													(eval(RoflFlight.draw))(RoflFlight,fakeData)
+												}
+											}
+											alreadyDrawn=true;
+										}
+									}
+									else if(thisEntity['class']=='lives'){
+										if(thisSettings['process']==true){
+											if(RoflFlight.isPaused()==true){thisEntity['display']=false;}
+											var theLives=parseInt(RoflFlight.lives);
+											if(theLives<=0){thisEntity['display']=false;}
+											for(var li=0;li<RoflFlight.lives;li++){
+												var fakeData=new Object();
+												for(var ev in thisEntity){fakeData[ev]=thisEntity[ev];}
+												fakeData=RoflFlight.formatEntity(fakeData);
+												fakeData['x']=RoflFlight.getWidth()-20-fakeData['w']-(thisEntity['w']*li)-(3*li);
+												fakeData['frames']=[RoflFlight.getAtlasLoc('heart')];
+												if(fakeData['display']==true){
+													(eval(RoflFlight.draw))(RoflFlight,fakeData)
+												}
+												alreadyDrawn=true;
+											}
+										}
+									}
+									else if(thisEntity['class']=='bollard'){
+										thisEntity['velocityX']=-RoflFlight.speed;
+										if(thisEntity['x']<(0-thisEntity['w'])){thisEntity['remove']=true;}
+										var playerEntity=RoflFlight.entity('player');
+										var impactZone=(playerEntity['x']+5+playerEntity['w']-(playerEntity['w']/7));
+										playerEntity['show']=='car'?impactZone=(playerEntity['x']+5+playerEntity['w']-3):null
+										if(thisEntity['x']<=impactZone&&thisEntity['x']>10&&playerEntity['y']>-110&&thisEntity['impact']==false&&thisEntity['answered']==false){
+											thisEntity['impact']=true;
+											RoflFlight.entities[RoflFlight.entityPos('player')]['velocityX']=-0.5;
+											RoflFlight.lives-=1;
+										}
+										thisEntity['y']=RoflFlight.getHeight()-parseFloat(thisEntity['h']);
+										if(thisEntity['focus']==true){
+											thisEntity['currentFrame']=1;
+										}
+										if(thisEntity['answered']==true||thisEntity['impact']==true){
+											thisEntity['answered']==true?thisEntity['currentFrame']=2:thisEntity['currentFrame']=0;
+											thisEntity['focus']=false;
+											thisEntity['velocityY']=(RoflFlight.speed*1.5);
+											thisEntity['fallingX']+=thisEntity['velocityY'];
+											thisEntity['rotate']+=2*(Math.PI/180);
+											thisEntity['rotate']>1.361356816555578?thisEntity['remove']=true:null;
+											thisEntity['y']+=thisEntity['fallingX'];
+											if(thisEntity['y']>=RoflFlight.getHeight()+parseFloat(thisEntity['h'])){
+												thisEntity['remove']=true;
+											}
+										}
+										(eval(RoflFlight.draw))(RoflFlight,thisEntity);
+										alreadyDrawn=true;
+										if(thisEntity['answered']==false&&thisEntity['impact']==false){
+											var thisQ=thisEntity['question']['q'];
+											RoflFlight.context.fillStyle='#FFF';
+											RoflFlight.context.font='bold 32px "Consolas"';
+											var textOffset=thisEntity['x']+(thisEntity['w']/2)-((18*thisQ.length)/2);
+											RoflFlight.context.fillText(thisQ,textOffset,(thisEntity['y']+100));
+										}
+									}
+									else if(thisEntity['class']=='play'){
+										if(RoflFlight.playing==false){
+											thisEntity['display']=true;
+											thisEntity['x']=(RoflFlight.getWidth()/2)-(thisEntity['w']/2);
+											thisEntity['y']=(RoflFlight.getHeight()/2)-(thisEntity['h']/2);
+										}
+										else{thisEntity['display']=false;}
+									}
+									else if(thisEntity['class']=='numberbutton'){
+										if(RoflFlight.isPaused()==true){thisEntity['display']=false;}
+										else{thisEntity['display']=true;}
+										thisEntity['y']=RoflFlight.getHeight()-thisEntity['h']-1;
+										for(var nb=0;nb<9;nb++){
+											var thisNumber=nb+1;
+											var fakeData=new Object();
+											for(var ev in thisEntity){fakeData[ev]=thisEntity[ev];}
+											fakeData=RoflFlight.formatEntity(fakeData);
+											fakeData['x']=(RoflFlight.getWidth()/2)-((thisEntity['w']*9)/2)-((6*8)/2)+(thisEntity['w']*nb)+(6*nb);
+											fakeData['currentFrame']=thisNumber;
+											if(fakeData['display']==true){
+												(eval(RoflFlight.draw))(RoflFlight,fakeData)
+											}
+										}
+										alreadyDrawn=true;
+									}
+									if(alreadyDrawn==false){
+										if(thisEntity['display']==true){
+											(eval(RoflFlight.draw))(RoflFlight,RoflFlight.entity(thisZIndexChild))
+										}
+									}
+									RoflFlight.entities[RoflFlight.entityPos(thisZIndexChild)]=thisEntity;
+								}
+							}
+						}
+					}
+					return window.requestAnimationFrame(RoflFlight['loop'])||window.webkitRequestAnimationFrame(RoflFlight['loop'])||window.mozRequestAnimationFrame(RoflFlight['loop'])||window.oRequestAnimationFrame(RoflFlight['loop'])||window.msRequestAnimationFrame(RoflFlight['loop'])||setTimeout(RoflFlight['loop'],(1000/60));
+					//setTimeout(RoflFlight['loop'],500);
+				},
+				clicked:function(e){
+					var x=0,y=0;
+					e.pageX?x=e.pageX:x=e.clientX+document.body.scrollLeft+document.documentElement.scrollLeft;
+					e.pageY?y=e.pageY:y=e.clientY+document.body.scrollTop+document.documentElement.scrollTop;
+					x-=RoflFlight.canvas.offsetLeft,y-=RoflFlight.canvas.offsetTop;
+					var playButton=RoflFlight.formatEntity(RoflFlight.entity('play'));
+					if(playButton['display']==true){
+						if((x>playButton['x']&&x<(playButton['x']+playButton['w']))&&(y>playButton['y']&&y<(playButton['y']+playButton['h']))){
+							RoflFlight.play();
+							RoflFlight.paused=false;
+							RoflFlight.playing=true;
+						}
+					}
+					var numberButton=RoflFlight.formatEntity(RoflFlight.entity('numberbuttons'));
+					if(numberButton['display']==true){
+						for(var nb=0;nb<9;nb++){
+							var thisNumber=nb+1;
+							var thisNumberButtonX=(RoflFlight.getWidth()/2)-((numberButton['w']*9)/2)-((6*8)/2)+(numberButton['w']*nb)+(6*nb);
+							var thisNumberButtonY=RoflFlight.getHeight()-numberButton['h']-1;
+							if((x>thisNumberButtonX&&x<(thisNumberButtonX+numberButton['w']))&&(y>thisNumberButtonY&&y<(thisNumberButtonY+numberButton['h']))){
+								RoflFlight.answerQuestion(String(thisNumber));
+							}
+						}
+					}
+				},
+				showCar:function(){RoflFlight.entities[RoflFlight.entityPos('player')]['show']='car';},
+				showCopter:function(){RoflFlight.entities[RoflFlight.entityPos('player')]['show']='copter';},
+				play:function(){
+					RoflFlight.clearAllEntities();
+					RoflFlight.entities.push(RoflFlight.formatEntity({'name':'player','zindex':3,'class':'player','velocityX':0.3,'velocityY':-0.3,'x':0,'y':10,'w':RoflFlight.getAtlasLoc('player_roflcopter_1')['w'],'h':RoflFlight.getAtlasLoc('player_roflcopter_1')['h'],'frames':[RoflFlight.getAtlasLoc('player_roflcopter_1'),RoflFlight.getAtlasLoc('player_roflcopter_2'),RoflFlight.getAtlasLoc('player_roflcar_1'),RoflFlight.getAtlasLoc('player_roflcar_2'),RoflFlight.getAtlasLoc('player_roflcar_3'),RoflFlight.getAtlasLoc('player_roflcar_4')],'animateDelayBetweenFrames':5,'animateCountUpBy':1,'animateWhilePaused':true,'moveWhilePaused':true,'show':'car'}));
+					RoflFlight.entities.push(RoflFlight.formatEntity({'name':'score','zindex':4,'class':'score','velocityX':false,'velocityY':false,'x':20,'y':20,'w':RoflFlight.atlasLocations['0_big']['w'],'h':RoflFlight.atlasLocations['0_big']['h'],'frames':[RoflFlight.getAtlasLoc('0_big')],'processWhilePaused':true}));
+					RoflFlight.entities.push(RoflFlight.formatEntity({'name':'lives','zindex':4,'class':'lives','velocityX':false,'velocityY':false,'x':100,'y':25,'w':40,'h':40,'frames':[RoflFlight.getAtlasLoc('heart')],'processWhilePaused':true}));
+					RoflFlight.entities.push(RoflFlight.formatEntity({'name':'play','zindex':5,'class':'play','velocityX':false,'velocityY':false,'x':100,'y':100,'w':RoflFlight.atlasLocations['play']['w'],'h':RoflFlight.atlasLocations['play']['h'],'frames':[RoflFlight.getAtlasLoc('play')]}));
+					RoflFlight.entities.push(RoflFlight.formatEntity({'name':'numberbuttons','zindex':2,'class':'numberbutton','velocityX':false,'velocityY':false,'x':100,'y':100,'w':RoflFlight.atlasLocations['0_big']['w'],'h':RoflFlight.atlasLocations['0_big']['h'],'frames':[RoflFlight.getAtlasLoc('0_big'),RoflFlight.getAtlasLoc('1_big'),RoflFlight.getAtlasLoc('2_big'),RoflFlight.getAtlasLoc('3_big'),RoflFlight.getAtlasLoc('4_big'),RoflFlight.getAtlasLoc('5_big'),RoflFlight.getAtlasLoc('6_big'),RoflFlight.getAtlasLoc('7_big'),RoflFlight.getAtlasLoc('8_big'),RoflFlight.getAtlasLoc('9_big')]}));
+					RoflFlight.questions.level=1;
+					RoflFlight.questions.addDelayMS=700;
+					RoflFlight.questions.currentDelayMS=0;
+					RoflFlight.questions.canAdd=true;
+					RoflFlight.score=0;
+					RoflFlight.lives=3;
+					if(window.top.location.hash.substring(1)=='copter'){
+						RoflFlight.showCopter()
+					}
+				},
+				init:function(){
+					setInterval(function(){RoflFlight.checkIfDay()},60000);
+					setInterval(function(){RoflFlight.questionTick()},10);
+					RoflFlight.checkIfDay();
+					RoflFlight.canvas=document.createElement('canvas');
+					RoflFlight.canvas.id='gamecanvas';
+					RoflFlight.canvas.style.position='absolute';
+					RoflFlight.canvas.style.top=0;
+					RoflFlight.canvas.style.left=0;
+					RoflFlight.canvas.addEventListener('click',function(e){RoflFlight.clicked(e)});
+					RoflFlight.context=RoflFlight.canvas.getContext('2d');
+					document.body.appendChild(RoflFlight.canvas);
+					var atlasURL='atlas.png';
+					var atlasA=document.createElement('a');atlasA.href=atlasURL;
+					var atlasIMG=new Image();
+					atlasIMG.src=atlasURL;
+					RoflFlight.setMinMax(atlasIMG,'w',1024);
+					RoflFlight.setMinMax(atlasIMG,'h',1024);
+					atlasIMG.addEventListener('load',function(){
+						var atlasCANVAS=document.createElement('canvas');
+						var atlasCONTEXT=atlasCANVAS.getContext('2d');
+						RoflFlight.setMinMax(atlasCANVAS,'w',1024);
+						RoflFlight.setMinMax(atlasCANVAS,'h',1024);
+						atlasCONTEXT.drawImage(atlasIMG,0,0,1024,1024);
+						RoflFlight.atlas=atlasCANVAS;
+					});
+					document.body.addEventListener('keydown',function(e){
+						if(e.keyCode==13){if(RoflFlight.isPaused()==true){
+							RoflFlight.paused=false;
+							RoflFlight.playing=true;
+							RoflFlight.play();
+						}}
+						else if(e.keyCode==49||e.keyCode==97){RoflFlight.answerQuestion('1')}
+						else if(e.keyCode==50||e.keyCode==98){RoflFlight.answerQuestion('2')}
+						else if(e.keyCode==51||e.keyCode==99){RoflFlight.answerQuestion('3')}
+						else if(e.keyCode==52||e.keyCode==100){RoflFlight.answerQuestion('4')}
+						else if(e.keyCode==53||e.keyCode==101){RoflFlight.answerQuestion('5')}
+						else if(e.keyCode==54||e.keyCode==103){RoflFlight.answerQuestion('6')}
+						else if(e.keyCode==55||e.keyCode==103){RoflFlight.answerQuestion('7')}
+						else if(e.keyCode==56||e.keyCode==104){RoflFlight.answerQuestion('8')}
+						else if(e.keyCode==57||e.keyCode==105){RoflFlight.answerQuestion('9')}
+					});
+					RoflFlight.loop();
+					RoflFlight.play();
+				}
+			};
+			setTimeout(function(){RoflFlight.init()},1);
+		</script>
+	</body>
+</html>
